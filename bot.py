@@ -131,6 +131,7 @@ def handle_phone(message):
     user_data.pop(message.chat.id, None)
 
 bot.polling(none_stop=True)
+
 import os
 from flask import Flask
 
