@@ -9,6 +9,7 @@ API_TOKEN = '7658197917:AAEe7pb2kjBJbrpQY75k36aXijBQlmOyklA'
 ADMIN_CHAT_ID = 947914394  
 
 bot = telebot.TeleBot(API_TOKEN)
+app = Flask(__name__)
 user_data = {}
 
 damage_elements = [
@@ -136,3 +137,14 @@ def index():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
+@app.route('/')
+def home():
+    return "Bot is running"
+
+def run_bot():
+    bot.polling(none_stop=True)
+
+if __name__ == '__main__':
+    threading.Thread(target=run_bot).start()
+    app.run(host='0.0.0.0', port=10000)
