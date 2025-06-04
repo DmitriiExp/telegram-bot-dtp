@@ -1,12 +1,12 @@
+import threading
+from flask import Flask
 import telebot
 from telebot import types
 import csv
 from datetime import datetime
-import os
-from flask import Flask
 
 API_TOKEN = '7658197917:AAEe7pb2kjBJbrpQY75k36aXijBQlmOyklA'
-ADMIN_CHAT_ID = 947914394  
+ADMIN_CHAT_ID = 947914394
 
 bot = telebot.TeleBot(API_TOKEN)
 app = Flask(__name__)
@@ -17,36 +17,32 @@ damage_elements = [
     "Фара передняя левая", "Фара передняя правая", "Капот",
     "Крыло заднее левое", "Крыло заднее правое", "Крышка багажника",
     "Заднее стекло", "Задняя левая фара", "Задняя правая фара",
-    "Другое", "Готово", "Назад"
+    "Другое", "Готово"
 ]
 
 def create_damage_keyboard():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
     row = []
     for i, item in enumerate(damage_elements):
-        if item in ["Готово", "Назад"]:
-            continue
         row.append(types.KeyboardButton(item))
         if len(row) == 2:
             kb.add(*row)
             row = []
     if row:
         kb.add(*row)
-    kb.add(types.KeyboardButton("Другое"))
-    kb.add(types.KeyboardButton("Готово"), types.KeyboardButton("Назад"))
     return kb
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     user_data[message.chat.id] = {}
-    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    kb.add(types.KeyboardButton("Запустить заново"))
-    bot.send_message(message.chat.id, "Привет! Я помогу рассчитать предварительный ущерб после ДТП. Нажми кнопку ниже, чтобы начать.", reply_markup=kb)
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add("Запустить заново")
+    bot.send_message(message.chat.id, "Привет! Отправь фото повреждений автомобиля.", reply_markup=markup)
 
 @bot.message_handler(func=lambda msg: msg.text == "Запустить заново")
-def restart_flow(message):
+def restart(message):
     user_data[message.chat.id] = {}
-    bot.send_message(message.chat.id, "Отправь фото повреждений автомобиля.", reply_markup=types.ReplyKeyboardRemove())
+    bot.send_message(message.chat.id, "Начнём заново. Отправь фото повреждений автомобиля.")
 
 @bot.message_handler(content_types=['photo'])
 def handle_photo(message):
@@ -57,16 +53,18 @@ def handle_photo(message):
 def handle_vin(message):
     user_data[message.chat.id]['vin'] = message.text.strip()
     user_data[message.chat.id]['parts'] = []
-    bot.send_message(message.chat.id, "Выбери повреждённые детали. Когда закончишь — нажми 'Готово'.", reply_markup=create_damage_keyboard())
+    kb = create_damage_keyboard()
+    kb.add(types.KeyboardButton("Назад"))
+    bot.send_message(message.chat.id, "Выбери повреждённые детали. Когда закончишь — нажми 'Готово'.", reply_markup=kb)
 
-@bot.message_handler(func=lambda msg: msg.text in damage_elements)
+@bot.message_handler(func=lambda msg: msg.text in damage_elements or msg.text == "Назад")
 def handle_part_selection(message):
     chat_id = message.chat.id
     selected = message.text
 
     if selected == "Назад":
         bot.send_message(chat_id, "Отправь VIN автомобиля заново.", reply_markup=types.ReplyKeyboardRemove())
-        user_data[chat_id].pop('vin', None)
+        del user_data[chat_id]['vin']
         return
 
     if selected == "Готово":
@@ -75,10 +73,10 @@ def handle_part_selection(message):
         total = base_price * len(selected_parts)
         user_data[chat_id]['total'] = total
         msg = f"Предварительная сумма ущерба: {total} ₽ по базам РСА (Мурманская обл.)\n\n⚠️ Это может быть заниженная сумма. Рекомендуем обратиться к эксперту-технику."
-        bot.send_message(chat_id, msg)
 
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
         markup.add(types.KeyboardButton("Да"), types.KeyboardButton("Нет"))
+        bot.send_message(chat_id, msg)
         bot.send_message(chat_id, "Хотите связаться с экспертом для более точной оценки?", reply_markup=markup)
         return
 
@@ -127,24 +125,10 @@ def handle_phone(message):
     bot.send_message(message.chat.id, "Спасибо! Ваша заявка отправлена эксперту.")
     user_data.pop(message.chat.id, None)
 
-# ===== Flask для Render =====
-app = Flask(__name__)
-
-@app.route('/')
-def index():
-    return "Бот работает"
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
-
-@app.route('/')
-def home():
-    return "Bot is running"
-
-def run_bot():
+# Запуск бота в отдельном потоке
+def start_bot():
     bot.polling(none_stop=True)
 
 if __name__ == '__main__':
-    threading.Thread(target=run_bot).start()
+    threading.Thread(target=start_bot).start()
     app.run(host='0.0.0.0', port=10000)
