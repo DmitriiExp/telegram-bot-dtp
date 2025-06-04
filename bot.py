@@ -83,7 +83,7 @@ def handle_part_selection(message):
     if 'parts' not in user_data[chat_id]:
         user_data[chat_id]['parts'] = []
 
-   if selected == "Другое":
+    if selected == "Другое":
     bot.send_message(chat_id, "Пожалуйста, опишите, какие повреждения вы имеете в виду.")
     user_data[chat_id]['awaiting_custom_part'] = True
     return
