@@ -83,8 +83,23 @@ def handle_part_selection(message):
     if 'parts' not in user_data[chat_id]:
         user_data[chat_id]['parts'] = []
 
-    if selected not in user_data[chat_id]['parts']:
-        user_data[chat_id]['parts'].append(selected)
+   if selected == "Другое":
+    bot.send_message(chat_id, "Пожалуйста, опишите, какие повреждения вы имеете в виду.")
+    user_data[chat_id]['awaiting_custom_part'] = True
+    return
+
+@bot.message_handler(func=lambda msg: user_data.get(msg.chat.id, {}).get('awaiting_custom_part'))
+def handle_custom_part(message):
+    chat_id = message.chat.id
+    part_name = message.text.strip()
+
+    if 'parts' not in user_data[chat_id]:
+        user_data[chat_id]['parts'] = []
+
+    user_data[chat_id]['parts'].append(f"Другое: {part_name}")
+    user_data[chat_id]['awaiting_custom_part'] = False
+
+    bot.send_message(chat_id, f"Добавлено: {part_name}\nВы можете выбрать ещё или нажмите 'Готово'.", reply_markup=create_damage_keyboard())
         bot.send_message(chat_id, f"Добавлено: {selected}\nВы можете выбрать ещё или нажмите 'Готово'.", reply_markup=create_damage_keyboard())
     else:
         bot.send_message(chat_id, f"{selected} уже выбрано. Выберите другой элемент или нажмите 'Готово'.", reply_markup=create_damage_keyboard())
